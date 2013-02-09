@@ -13,13 +13,25 @@ Apeache.start = function () {
 };
 
 Apeache.respond = function (req, res) {
-    if (req.url !== '/') {
-        Apeache.throwError(res, 404, 'Could not find file: ' + req.url);
-        return false;
-    }
-
-    if (req.method === 'POST') {
-    
+    if (req.url === '/') {
+        req.on('end', function () {
+            Apeache.visitor_count += 1;
+            console.log('Visitor #' + Apeache.visitor_count + ': ' + req.connection.remoteAddress);
+            res.writeHead(200, {'Content-Type': 'text/html'});
+            res.write('<!DOCTYPE html><head><title>Apeache</title></head><body>');
+            res.write('Someone said: ' + Apeache.escapeHtml(fs.readFileSync('data.txt', 'utf-8')));
+            res.write(fs.readFileSync('form.html', 'utf-8'));
+            res.write(Apeache.visitor_count + ' visitors since last reboot.');
+            res.end('</body></html>');
+        });
+    } else if (req.url === '/post') {
+        if (req.method !== 'POST') {
+            res.writeHead(302, {
+                'Location': '/'
+            });
+            res.end();
+        }
+        
         var body = '';
         req.on('data', function (chunk) {
             body += chunk;
@@ -27,34 +39,21 @@ Apeache.respond = function (req, res) {
 
         req.on('end', function () {
             var POST = qs.parse(body);
+            Apeache.visitor_count += 1;
             res.writeHead(200, {'Content-Type': 'text/html'});
             res.write('<!DOCTYPE html><head><title>Apeache</title></head><body>');
 
-            // save text to file
             fs.writeFile('data.txt', POST.usertext, function (err) {
                 if (err) { console.log(err); }
-
-                // Show text from file
                 res.write('You said: ' + Apeache.escapeHtml(fs.readFileSync('data.txt', 'utf-8')));
-
-                // Show form
                 res.write(fs.readFileSync('form.html', 'utf-8'));
+                res.write(Apeache.visitor_count + ' visitors since last reboot.');
                 res.end('</body></html>');
             });
         });
     } else {
-        req.on('end', function () {
-            Apeache.visitor_count += 1;
-            console.log('Visitor # ' + Apeache.visitor_count + ': ' + req.connection.remoteAddress);
-
-            res.writeHead(200, {'Content-Type': 'text/html'});
-            res.write('<!DOCTYPE html><head><title>Apeache</title></head><body>');
-            // Show text from file
-            res.write('Someone said: ' + Apeache.escapeHtml(fs.readFileSync('data.txt', 'utf-8')));
-            // Show form
-            res.write(fs.readFileSync('form.html', 'utf-8'));
-            res.end('</body></html>');
-        });
+        Apeache.throwError(res, 404, 'Could not find file: ' + req.url);
+        return false;
     }
 };
 
